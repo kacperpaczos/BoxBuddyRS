@@ -17,11 +17,10 @@ use gtk::{
 mod distrobox_handler;
 use distrobox_handler::{
     assemble_box, clone_box, create_box, delete_box, export_app_from_box, get_all_distroboxes,
-    parse_assemble_ini, IniBoxSection,
     get_apps_in_box, get_available_images_with_distro_name, get_binaries_exported_from_box,
     get_number_of_boxes, install_deb_in_box, install_rpm_in_box, open_terminal_in_box,
-    remove_app_from_host, remove_exported_binary_from_box, run_command_in_box, stop_box,
-    upgrade_all_boxes, upgrade_box, DBox, DBoxApp,
+    parse_assemble_ini, remove_app_from_host, remove_exported_binary_from_box, run_command_in_box,
+    stop_box, upgrade_all_boxes, upgrade_box, DBox, DBoxApp, IniBoxSection,
 };
 
 mod utils;
@@ -324,7 +323,7 @@ fn build_not_installed_status_page(title: &str, body: &str) -> adw::StatusPage {
 
 fn render_not_installed(scroll_area: &gtk::Box) {
     clear_children(scroll_area);
-  
+
     // TRANSLATORS: Error message shown when distrobox is not installed
     let title = gettext("Distrobox not found!");
     // TRANSLATORS: Error message shown when distrobox is not installed
@@ -636,11 +635,19 @@ fn show_assemble_preview_dialog(
         if section.nvidia {
             subtitle_bits.push("nvidia".to_string());
         }
-        if !section.extra_keys.is_empty() {
-            subtitle_bits.push(format!("+{} more", section.extra_keys.len()));
+        // Show every key the .ini sets, including ones BoxBuddy has no field
+        // for. A confirmation that hid them would give false assurance - the
+        // file could mount a host path, or run an init_hook that fetches and
+        // executes a script, and none of it would be on screen. So the point
+        // is to surface exactly what will be handed to distrobox.
+        for (key, value) in &section.extra_keys {
+            subtitle_bits.push(format!("{key} = {value}"));
         }
         if !subtitle_bits.is_empty() {
-            row.set_subtitle(&subtitle_bits.join(" • "));
+            // Long values (a hook command, a volume list) must be readable in
+            // full, not ellipsized to a teaser, so let the subtitle wrap.
+            row.set_subtitle(&subtitle_bits.join("\n"));
+            row.set_subtitle_lines(0);
         }
 
         list.append(&row);
