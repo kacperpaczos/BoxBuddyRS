@@ -313,7 +313,7 @@ fn build_not_installed_status_page(title: &str, body: &str) -> adw::StatusPage {
 
 fn render_not_installed(scroll_area: &gtk::Box) {
     clear_children(scroll_area);
-  
+
     // TRANSLATORS: Error message shown when distrobox is not installed
     let title = gettext("Distrobox not found!");
     // TRANSLATORS: Error message shown when distrobox is not installed
@@ -1000,11 +1000,7 @@ fn on_upgrade_clicked(box_name: &str) {
     upgrade_box(box_name);
 }
 
-fn on_show_applications_clicked(
-    window: &ApplicationWindow,
-    box_name: String,
-    box_image: String,
-) {
+fn on_show_applications_clicked(window: &ApplicationWindow, box_name: String, box_image: String) {
     let apps_popup = gtk::Window::builder()
         // TRANSLATORS: Window Title - shows list of installed applications in distrobox
         .title(gettext("Installed Applications"))
@@ -1106,10 +1102,9 @@ fn on_show_applications_clicked(
 
                                 // Uninstall button: removes the application
                                 // from inside the box via the distro's
-                                // package manager. We pass the executable
-                                // name (which doubles as the package name
-                                // for most distros) plus the box's image so
-                                // the right manager can be picked.
+                                // package manager. The handler asks the
+                                // box which package owns the executable,
+                                // so the raw Exec= value is enough here.
                                 // TRANSLATORS: Button Label
                                 let uninstall_btn = gtk::Button::with_label(&gettext("Uninstall"));
                                 uninstall_btn.add_css_class("pill");
@@ -1121,7 +1116,7 @@ fn on_show_applications_clicked(
                                     uninstall_app_in_box(
                                         un_box_name.clone(),
                                         un_image.clone(),
-                                        format!("remove {un_exec}"),
+                                        un_exec.clone(),
                                     );
                                 });
                                 row.add_suffix(&uninstall_btn);
