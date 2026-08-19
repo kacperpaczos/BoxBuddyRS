@@ -25,9 +25,9 @@ use distrobox_handler::{
 
 mod utils;
 use utils::{
-    get_assemble_icon, get_cpu_and_mem_usage, get_deb_distros, get_distro_color,
-    get_distro_icon_name, get_distro_img, get_download_dir_path, get_my_deb_boxes, get_my_rpm_boxes,
-    get_rpm_distros, get_supported_terminals, get_supported_terminals_list,
+    get_assemble_icon, get_cpu_and_mem_usage, get_deb_distros, get_distro_color_css,
+    get_distro_icon_name, get_distro_img, get_download_dir_path, get_my_deb_boxes,
+    get_my_rpm_boxes, get_rpm_distros, get_supported_terminals, get_supported_terminals_list,
     get_terminal_and_separator_arg, has_distrobox_installed, has_file_extension, has_host_access,
     has_podman_or_docker_installed, set_up_localisation,
 };
@@ -313,7 +313,7 @@ fn build_not_installed_status_page(title: &str, body: &str) -> adw::StatusPage {
 
 fn render_not_installed(scroll_area: &gtk::Box) {
     clear_children(scroll_area);
-  
+
     // TRANSLATORS: Error message shown when distrobox is not installed
     let title = gettext("Distrobox not found!");
     // TRANSLATORS: Error message shown when distrobox is not installed
@@ -371,6 +371,25 @@ fn load_boxes(scroll_area: &gtk::Box, window: &ApplicationWindow, active_page: O
     }
 }
 
+/// Loads the distro-colour CSS classes into the display, once. Doing this
+/// per box would pile up a provider for every tab of every rerender, and
+/// since every provider defined the same class, each new box repainted every
+/// existing bar with its own colour - the last box always won.
+fn ensure_distro_color_styles() {
+    static LOADED: std::sync::Once = std::sync::Once::new();
+    LOADED.call_once(|| {
+        if let Some(display) = gtk::gdk::Display::default() {
+            let provider = gtk::CssProvider::new();
+            provider.load_from_string(&get_distro_color_css());
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+    });
+}
+
 fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::Box {
     let box_name = dbox.name.clone();
 
@@ -391,24 +410,11 @@ fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::B
     let badge_box = gtk::Box::new(Orientation::Horizontal, 6);
     badge_box.set_valign(Align::Center);
 
+    ensure_distro_color_styles();
     let color_bar = gtk::Box::new(Orientation::Vertical, 0);
     color_bar.set_size_request(4, 32);
     color_bar.add_css_class("distro-color-bar");
-    // Inline CSS provider so we do not need a separate stylesheet file.
-    // The colour comes from the same lookup table that fed the old
-    // Unicode dot, so the bar and the dot are guaranteed to agree.
-    let color_provider = gtk::CssProvider::new();
-    color_provider.load_from_data(&format!(
-        ".distro-color-bar {{ background-color: {}; border-radius: 2px; min-height: 32px; min-width: 4px; }}",
-        get_distro_color(&dbox.distro)
-    ));
-    if let Some(display) = gtk::gdk::Display::default() {
-        gtk::style_context_add_provider_for_display(
-            &display,
-            &color_provider,
-            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
-    }
+    color_bar.add_css_class(&format!("distro-color-bar-{}", dbox.distro));
     badge_box.append(&color_bar);
 
     if let Some(icon_name) = get_distro_icon_name(&dbox.distro) {
