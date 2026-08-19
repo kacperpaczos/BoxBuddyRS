@@ -19,8 +19,8 @@ mod distrobox_handler;
 use distrobox_handler::{
     assemble_box, clone_box, create_box, delete_box, export_app_from_box, get_all_distroboxes,
     get_apps_in_box, get_available_images_with_distro_name, get_binaries_exported_from_box,
-    get_number_of_boxes, install_deb_in_box, install_rpm_in_box, open_terminal_in_box,
-    remove_app_from_host, remove_exported_binary_from_box, run_command_in_box, stop_box,
+    get_number_of_boxes, install_deb_in_box, install_rpm_in_box, open_terminal_in_box, reboot_box,
+    remove_app_from_host, remove_exported_binary_from_box, run_command_in_box, start_box, stop_box,
     uninstall_app_in_box, upgrade_all_boxes, upgrade_box, DBox, DBoxApp,
 };
 
@@ -494,6 +494,20 @@ fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::B
         delayed_rerender(&win_clone, Some(tab_num));
     });
 
+    // Start button is the visible counterpart of Stop - it makes sense to
+    // add the row right next to Stop so the titlebar keeps a single
+    // trailing button.
+    let start_btn = gtk::Button::from_icon_name("media-playback-start-symbolic");
+    // TRANSLATORS: Button tooltip
+    start_btn.set_tooltip_text(Some(&gettext("Start Box")));
+
+    let start_bn_clone = dbox.name.clone();
+    let start_win_clone = window.clone();
+    start_btn.connect_clicked(move |_btn| {
+        start_box(&start_bn_clone);
+        delayed_rerender(&start_win_clone, Some(tab_num));
+    });
+
     let title_box = gtk::Box::new(Orientation::Horizontal, 10);
     title_box.set_margin_start(10);
     title_box.append(&badge_box);
@@ -502,6 +516,8 @@ fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::B
 
     if dbox.is_running {
         title_box.append(&stop_btn);
+    } else {
+        title_box.append(&start_btn);
     }
 
     // list view
@@ -534,6 +550,18 @@ fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::B
 
     let up_bn_clone = box_name.clone();
     upgrade_row.connect_activated(move |_row| on_upgrade_clicked(&up_bn_clone));
+
+    // Reboot Box Icon
+    let reboot_icon = gtk::Image::from_icon_name("system-reboot-symbolic");
+
+    let reboot_row = ActionRow::new();
+    // TRANSLATORS: Row Label
+    reboot_row.set_title(&gettext("Reboot Box"));
+    reboot_row.add_suffix(&reboot_icon);
+    reboot_row.set_activatable(true);
+
+    let reboot_bn_clone = box_name.clone();
+    reboot_row.connect_activated(move |_row| on_reboot_clicked(&reboot_bn_clone));
 
     // Show Applications Icon
     let show_applications_icon =
@@ -591,6 +619,7 @@ fn make_box_tab(dbox: &DBox, window: &ApplicationWindow, tab_num: u32) -> gtk::B
     // put all into list
     boxed_list.append(&open_terminal_row);
     boxed_list.append(&upgrade_row);
+    boxed_list.append(&reboot_row);
     boxed_list.append(&show_applications_row);
 
     // Make deb / rpm row if applicable
@@ -1114,6 +1143,10 @@ fn build_empty_state_page(title: &str) -> adw::StatusPage {
     status_page.set_vexpand(true);
 
     status_page
+}
+
+fn on_reboot_clicked(box_name: &str) {
+    reboot_box(box_name);
 }
 
 fn on_show_applications_clicked(window: &ApplicationWindow, box_name: String, box_image: String) {

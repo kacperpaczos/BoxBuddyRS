@@ -1,5 +1,5 @@
 use crate::utils::{
-    get_command_output, get_host_desktop_files, get_repository_list,
+    get_command_output, get_container_runtime, get_host_desktop_files, get_repository_list,
     get_terminal_and_separator_arg, is_flatpak, is_nvidia, run_command,
 };
 use std::process::Command;
@@ -540,6 +540,70 @@ pub fn remove_exported_binary_from_box(box_name: &str, binary: &str) {
 
 pub fn stop_box(box_name: &str) {
     let _ = run_command("distrobox", Some(&["stop", box_name, "--yes"]));
+}
+
+/// Starts a stopped container via the underlying container engine.
+/// `distrobox start` does not exist; entering the box would start it too,
+/// but that spawns a shell we would immediately have to throw away, so
+/// asking the runtime directly is the quiet way to bring it back up.
+pub fn start_box(box_name: &str) {
+    let runtime = get_container_runtime();
+    let _ = run_command(&runtime, Some(&["start", box_name]));
+}
+
+/// Stops and then starts the box again so the user picks up any image
+/// updates or in-box service restarts. Runs in a terminal so the user
+/// can see the output.
+pub fn reboot_box(box_name: &str) {
+    let (term, sep, term_is_flatpak) = get_terminal_and_separator_arg();
+    let runtime = get_container_runtime();
+    let command = format!("distrobox stop {box_name} --yes; {runtime} start {box_name}");
+
+    if is_flatpak() {
+        if term_is_flatpak {
+            Command::new("flatpak-spawn")
+                .arg("--host")
+                .arg("flatpak")
+                .arg("run")
+                .arg(term)
+                .arg(sep)
+                .arg("bash")
+                .arg("-c")
+                .arg(&command)
+                .spawn()
+                .unwrap();
+        } else {
+            Command::new("flatpak-spawn")
+                .arg("--host")
+                .arg(term)
+                .arg(sep)
+                .arg("bash")
+                .arg("-c")
+                .arg(&command)
+                .spawn()
+                .unwrap();
+        }
+    } else {
+        if term_is_flatpak {
+            Command::new("flatpak")
+                .arg("run")
+                .arg(term)
+                .arg(sep)
+                .arg("bash")
+                .arg("-c")
+                .arg(&command)
+                .spawn()
+                .unwrap();
+        } else {
+            Command::new(term)
+                .arg(sep)
+                .arg("bash")
+                .arg("-c")
+                .arg(&command)
+                .spawn()
+                .unwrap();
+        }
+    }
 }
 
 /// Gets count of boxes, used to move the active page on the Notebook to the newest
